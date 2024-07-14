@@ -38,12 +38,16 @@ def write_dicts_to_jsonl(dict_list, output_file):
     output_file (str): The name of the output JSON Lines file.
     """
     try:
-        with open(output_file, 'w') as f:
+        output_folder = os.sep.join(output_file.split(os.sep)[:-1])
+        create_folder_if_not_exists(output_folder)
+
+        with open(output_file, "w+") as f:
             for entry in dict_list:
                 json_line = json.dumps(entry)
                 f.write(json_line + '\n')
+
     except Exception as e:
-        print(f"An error occurred while writing to the file '{output_file}': {e}")
+        print(f"[EXCEPTION RAISED] An error occurred when writing to the file '{output_file}': {e}")
 
 def to_string(data):
     """
