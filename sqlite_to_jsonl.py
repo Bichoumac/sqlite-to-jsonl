@@ -2,6 +2,7 @@ import os
 import argparse
 import sqlite3
 import json
+import shutil
 
 def is_sqlite3(filename):
     """
@@ -96,7 +97,32 @@ def get_tables (cursor):
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     tables = [row[0] for row in cursor.fetchall()]
     return tables
-     
+
+def apply_wal (conn, input_filename):
+    """
+    Apply the wal file to the database
+    """
+
+    wal_name = input_filename+"-wal"
+    if not os.path.exists(wal_name):
+        print("[INFO] No WAL applied to", input_filename)
+    
+    # Backup of the original
+    # Faites une copie de sauvegarde de la base de données originale
+    backup_path = input_filename + '.backup'
+    shutil.copy(input_filename, backup_path)
+    print(f"[INFO] A backup has been done: {backup_path}.")
+    
+    try : 
+        conn.execute("PRAGMA wal_checkpoint(FULL);")
+        conn.execute("VACUUM;")
+        os.remove(backup_path)
+    except Exception as e :
+        shutil.copy(backup_path, input_filename)
+        os.remove(backup_path)
+        print("[EXCEPTION RAISED] Applying WAL:", e)
+    
+
 def process_file(input_filename, output_dir, already_checked=False):
     """
     Convert the input to jsonl file, one file per table.
@@ -113,6 +139,9 @@ def process_file(input_filename, output_dir, already_checked=False):
             # Connect to the sqlite3 database
             conn = sqlite3.connect(input_filename)
             cursor = conn.cursor()
+            
+            # Try to apply the WAL file
+            apply_wal(conn, input_filename)
             
             # Retrieve all the tables
             tables = get_tables(cursor)
@@ -136,7 +165,8 @@ def process_folder(input_foldername, output_dir):
     Read each file of a folder, and process all sqlite3 file
     """
     
-    for file in os.listdir(input_foldername):
+    list_file = os.listdir(input_foldername)
+    for file in list_file:
         filename = os.path.join(input_foldername, file)
         if os.path.isfile(filename) and is_sqlite3(filename):
             process_file(filename, output_dir, already_checked=True)
